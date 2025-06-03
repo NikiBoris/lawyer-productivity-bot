@@ -10,8 +10,8 @@ from telegram.ext import (
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 CHOOSING_TASK, TYPING_COUNT, CONFIRM_NEXT = range(3)
-ADMIN_ID = 123456789  # Замените на ваш Telegram ID
-BOT_TOKEN = "PASTE_YOUR_BOT_TOKEN_HERE"  # Замените на токен от @BotFather
+ADMIN_ID = 6321900094  # Замените на ваш Telegram ID
+BOT_TOKEN = "8033295385:AAE4XlejUznJ-4Ue4iyhheNfDfrNXABCYNA"  # Замените на токен от @BotFather
 
 EXCEL_FILE = "daily_report.xlsx"
 USER_FILE = "users.json"
@@ -130,7 +130,7 @@ async def statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         file_path = f"stat_{user.id}.xlsx"
         df.to_excel(file_path, index=False)
-        await update.message.reply_document(open(file_path, "rb"), filename="статистика.xlsx")
+        await update.message.reply_document(open(file_path, "rb"), filename="stats.xlsx")
 
 def main():
     init_excel()
@@ -146,7 +146,7 @@ def main():
         fallbacks=[]
     )
     application.add_handler(conv_handler)
-    application.add_handler(CommandHandler("статистика", statistics))
+    application.add_handler(CommandHandler("stats", statistics))
 
     scheduler = AsyncIOScheduler()
     scheduler.add_job(send_reminder, "cron", hour=17, minute=0, args=[application.bot])
