@@ -148,7 +148,7 @@ def main():
     application.add_handler(conv_handler)
     application.add_handler(CommandHandler("stats", statistics))
 
-    scheduler = AsyncIOScheduler()
+    scheduler = BackgroundScheduler()
     scheduler.add_job(send_reminder, "cron", hour=17, minute=0, args=[application.bot])
     scheduler.start()
 
