@@ -7,7 +7,7 @@ from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     ContextTypes, filters, ConversationHandler
 )
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 
 CHOOSING_TASK, TYPING_COUNT, CONFIRM_NEXT = range(3)
 ADMIN_ID = 6321900094  # Замените на ваш Telegram ID
