@@ -2,17 +2,16 @@
 import json
 import pandas as pd
 from datetime import datetime
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     ContextTypes, filters, ConversationHandler
 )
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-# Константы
-TASK_SELECT, TASK_COUNT = range(2)
-ADMIN_ID = 6321900094  # <-- ЗАМЕНИ НА СВОЙ TELEGRAM ID
-BOT_TOKEN = "8033295385:AAE4XlejUznJ-4Ue4iyhheNfDfrNXABCYNA"  # <-- ЗАМЕНИ НА ТОКЕН ОТ BotFather
+CHOOSING_TASK, TYPING_COUNT, CONFIRM_NEXT = range(3)
+ADMIN_ID = 123456789  # Замените на ваш Telegram ID
+BOT_TOKEN = "PASTE_YOUR_BOT_TOKEN_HERE"  # Замените на токен от @BotFather
 
 EXCEL_FILE = "daily_report.xlsx"
 USER_FILE = "users.json"
@@ -27,7 +26,7 @@ def init_excel():
     try:
         pd.read_excel(EXCEL_FILE)
     except FileNotFoundError:
-        df = pd.DataFrame(columns=["Дата", "Юрист", "Задача", "Количество"])
+        df = pd.DataFrame(columns=["Дата", "Юрист", "ID", "Задача", "Количество"])
         df.to_excel(EXCEL_FILE, index=False)
 
 def load_users():
@@ -35,93 +34,103 @@ def load_users():
         with open(USER_FILE, "r") as f:
             return json.load(f)
     except FileNotFoundError:
-        return []
+        return {}
 
-def save_user(user_id):
+def save_user(user_id, full_name):
     users = load_users()
-    if user_id not in users:
-        users.append(user_id)
-        with open(USER_FILE, "w") as f:
-            json.dump(users, f)
+    users[str(user_id)] = full_name
+    with open(USER_FILE, "w") as f:
+        json.dump(users, f)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    save_user(user_id)
+    user = update.effective_user
+    save_user(user.id, user.full_name)
 
-    keyboard = [[task] for task in TASKS]
+    keyboard = [[KeyboardButton(task)] for task in TASKS]
     await update.message.reply_text(
         "Выберите задачу:",
-        reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+        reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
     )
-    return TASK_SELECT
+    return CHOOSING_TASK
 
-async def handle_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    task = update.message.text
-    context.user_data["task"] = task
-    await update.message.reply_text(f"Сколько задач '{task}' вы выполнили?")
-    return TASK_COUNT
+async def choose_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["task"] = update.message.text
+    await update.message.reply_text(f"Сколько задач '{update.message.text}' вы выполнили?")
+    return TYPING_COUNT
 
-async def handle_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def type_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         count = int(update.message.text)
         if count < 0:
             raise ValueError
     except ValueError:
-        await update.message.reply_text("Введите, пожалуйста, положительное число.")
-        return TASK_COUNT
+        await update.message.reply_text("Введите положительное число.")
+        return TYPING_COUNT
 
-    username = update.effective_user.full_name
+    user = update.effective_user
+    username = user.full_name
+    user_id = user.id
     task = context.user_data["task"]
     today = datetime.now().date()
 
     df = pd.read_excel(EXCEL_FILE)
-    df = pd.concat([df, pd.DataFrame([{
+    new_row = {
         "Дата": today,
         "Юрист": username,
+        "ID": user_id,
         "Задача": task,
         "Количество": count
-    }])], ignore_index=True)
+    }
+    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
     df.to_excel(EXCEL_FILE, index=False)
 
-    await update.message.reply_text("Результативность записана. Спасибо!")
-    return ConversationHandler.END
+    keyboard = [[KeyboardButton("✅ Да"), KeyboardButton("❌ Нет")]]
+    await update.message.reply_text("Результативность записана. Добавить ещё задачу?",
+                                    reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
+    return CONFIRM_NEXT
+
+async def confirm_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.lower()
+    if "да" in text:
+        keyboard = [[KeyboardButton(task)] for task in TASKS]
+        await update.message.reply_text("Выберите задачу:",
+                                        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
+        return CHOOSING_TASK
+    else:
+        await update.message.reply_text("Спасибо! До завтра.")
+        return ConversationHandler.END
 
 async def send_reminder(context: ContextTypes.DEFAULT_TYPE):
     users = load_users()
     for user_id in users:
         try:
             await context.bot.send_message(
-                chat_id=user_id,
-                text="⏰ Не забудьте заполнить результативность за сегодня!"
+                chat_id=int(user_id),
+                text="⏰ Напоминание: не забудьте заполнить результативность за сегодня!"
             )
         except Exception as e:
-            print(f"Ошибка при отправке напоминания {user_id}: {e}")
+            print(f"Ошибка отправки напоминания {user_id}: {e}")
 
-async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
-    df = pd.read_excel(EXCEL_FILE)
-    today = datetime.now().date()
-    daily_df = df[df["Дата"] == today]
-
-    if not daily_df.empty:
-        file_path = f"report_{today}.xlsx"
-        daily_df.to_excel(file_path, index=False)
-        await context.bot.send_document(chat_id=ADMIN_ID, document=open(file_path, "rb"),
-                                        filename=file_path, caption="Ежедневный отчёт")
-    else:
-        await context.bot.send_message(chat_id=ADMIN_ID, text="Нет данных за сегодня.")
-
-async def send_monthly_report(context: ContextTypes.DEFAULT_TYPE):
+async def statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
     df = pd.read_excel(EXCEL_FILE)
     now = datetime.now()
-    monthly_df = df[(pd.to_datetime(df["Дата"]).dt.month == now.month)]
+    current_month = now.month
 
-    if not monthly_df.empty:
-        file_path = f"monthly_report_{now.strftime('%Y_%m')}.xlsx"
-        monthly_df.to_excel(file_path, index=False)
-        await context.bot.send_document(chat_id=ADMIN_ID, document=open(file_path, "rb"),
-                                        filename=file_path, caption="Ежемесячный отчёт")
+    if user.id == ADMIN_ID:
+        if context.args:
+            name_filter = " ".join(context.args)
+            df = df[df['Юрист'].str.contains(name_filter, case=False, na=False)]
+        df = df[pd.to_datetime(df['Дата']).dt.month == current_month]
     else:
-        await context.bot.send_message(chat_id=ADMIN_ID, text="Нет данных за месяц.")
+        df = df[(df['ID'] == user.id) & (pd.to_datetime(df['Дата']).dt.month == current_month)]
+
+    if df.empty:
+        await update.message.reply_text("Нет данных для отображения.")
+    else:
+        file_path = f"stat_{user.id}.xlsx"
+        df.to_excel(file_path, index=False)
+        await update.message.reply_document(open(file_path, "rb"), filename="статистика.xlsx")
 
 def main():
     init_excel()
@@ -130,17 +139,17 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
-            TASK_SELECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_task)],
-            TASK_COUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_quantity)]
+            CHOOSING_TASK: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_task)],
+            TYPING_COUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, type_count)],
+            CONFIRM_NEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_next)]
         },
         fallbacks=[]
     )
     application.add_handler(conv_handler)
+    application.add_handler(CommandHandler("статистика", statistics))
 
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(send_reminder, "cron", hour=17, minute=45, args=[application.bot])
-    scheduler.add_job(send_daily_report, "cron", hour=18, minute=0, args=[application.bot])
-    scheduler.add_job(send_monthly_report, "cron", day=1, hour=9, minute=0, args=[application.bot])
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(send_reminder, "cron", hour=17, minute=0, args=[application.bot])
     scheduler.start()
 
     application.run_polling()

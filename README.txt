@@ -1,14 +1,5 @@
-
-Инструкция:
-
-1. Установи Python с https://python.org
-2. Установи библиотеки (в командной строке):
-   pip install -r requirements.txt
-
-3. Получи токен бота от @BotFather и замени в файле bot.py:
-   BOT_TOKEN = "PASTE_YOUR_BOT_TOKEN_HERE"
-
-4. Укажи свой Telegram ID в переменной ADMIN_ID
-
-5. Запусти бота:
-   python bot.py
+1. Замените BOT_TOKEN и ADMIN_ID в bot.py
+2. Установите библиотеки: pip install -r requirements.txt
+3. Запустите бота: python bot.py
+4. В Render добавьте переменные окружения BOT_TOKEN и ADMIN_ID
+5. Перезапустите Web Service после обновления кода.
