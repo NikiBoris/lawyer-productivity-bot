@@ -10,8 +10,8 @@ from telegram.ext import (
 from apscheduler.schedulers.background import BackgroundScheduler
 
 CHOOSING_TASK, TYPING_COUNT, CONFIRM_NEXT = range(3)
-ADMIN_ID = 123456789  # Замените на ваш Telegram ID
-BOT_TOKEN = "PASTE_YOUR_BOT_TOKEN_HERE"  # Замените на токен от @BotFather
+ADMIN_ID = 6321900094 # Замените на ваш Telegram ID
+BOT_TOKEN = "8033295385:AAE4XlejUznJ-4Ue4iyhheNfDfrNXABCYNA"  # Замените на токен от @BotFather
 
 EXCEL_FILE = "daily_report.xlsx"
 USER_FILE = "users.json"
