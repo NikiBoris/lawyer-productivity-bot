@@ -140,15 +140,10 @@ async def statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "/start — начать отчёт по задачам
-"
-        "/stats — статистика за месяц
-"
-        "/help — помощь
-
-"
-        "✅ После каждой задачи можно добавить ещё одну
-"
+        "/start — начать отчёт по задачам\n"
+        "/stats — статистика за месяц\n"
+        "/help — помощь\n\n"
+        "✅ После каждой задачи можно добавить ещё одну\n"
         "⏰ Напоминание приходит каждый день в 17:00"
     )
     await update.message.reply_text(text)
